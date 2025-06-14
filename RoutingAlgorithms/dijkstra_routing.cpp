@@ -1,14 +1,16 @@
 #include <iostream>     
-#include <map>          // For map (associative container)
+#include <map>          // For using map to represent graph (adjacency list)
+#include <queue>        // For priority queue used in Dijkstra's algorithm
 #include <string>       // For using strings as node names
-#include <limits>       // For numeric_limits to represent infinity
+#include <limits>       // For representing infinity (max int value)
 
 using namespace std;
 
-// Define Graph type as a map of node names to their neighbors and edge costs
+// Define 'Graph' as a type alias for map of maps.
+// Each node maps to another map of its neighbors and edge costs.
 using Graph = map<string, map<string, int>>;
 
-// Function to build the graph based on user input
+// Function to create a graph using user input
 Graph create_graph() {
     Graph graph;
     int num_nodes;
@@ -16,39 +18,38 @@ Graph create_graph() {
     // Ask user for number of nodes
     cout << "Enter number of nodes: ";
     cin >> num_nodes;
-    cin.ignore();  // Clear newline character from input buffer
+    cin.ignore();  // Clear the newline character left in input buffer
 
-    // Input all node names
+    // Read each node's name and initialize its adjacency list
     cout << "Enter node names:\n";
     for (int i = 0; i < num_nodes; ++i) {
         string node;
-        getline(cin, node);           // Read node name
-        graph[node] = map<string, int>();  // Initialize empty neighbor list
+        getline(cin, node);           // Read the node name
+        graph[node] = map<string, int>();  // Initialize its neighbors map
     }
 
-    // Ask user for number of edges
     int num_edges;
     cout << "\nEnter number of edges: ";
     cin >> num_edges;
-    cin.ignore();
+    cin.ignore();  // Clear buffer again
 
-    // Input all edges with costs
-    cout << "Enter edges and costs:\n";
+    // Read each edge with its cost
+    cout << "Enter edges and their costs:\n";
     for (int i = 0; i < num_edges; ++i) {
         string u, v;
         int cost;
 
         cout << "From node: ";
-        getline(cin, u);  // Start node
+        getline(cin, u);
 
         cout << "To node: ";
-        getline(cin, v);  // End node
+        getline(cin, v);
 
         cout << "Cost from " << u << " to " << v << ": ";
         cin >> cost;
-        cin.ignore();     // Clear buffer
+        cin.ignore();
 
-        // Add edge in both directions (assuming undirected graph)
+        // Since the graph is undirected, add both directions
         graph[u][v] = cost;
         graph[v][u] = cost;
     }
@@ -56,7 +57,7 @@ Graph create_graph() {
     return graph;  // Return the constructed graph
 }
 
-// Optional: Function to display the entire graph structure
+// Function to print the graph structure (adjacency list)
 void print_graph(const Graph& graph) {
     cout << "\n--- Graph Structure ---\n";
     for (const auto& node : graph) {
@@ -68,63 +69,77 @@ void print_graph(const Graph& graph) {
     }
 }
 
-// Function implementing the Distance Vector Routing algorithm using Bellman-Ford
-void distance_vector(const Graph& graph, const string& source) {
-    cout << "\n--- Distance Vector Routing (Bellman-Ford Algorithm) ---\n";
+// Function to perform Link-State routing using Dijkstra's algorithm
+void link_state(const Graph& graph, const string& source) {
+    cout << "\n--- Link-State Routing (Dijkstra's Algorithm) ---\n";
 
-    map<string, int> distance;  // Store shortest distances from source
+    // Distance map to store shortest distance from source to each node
+    map<string, int> distance;
 
-    // Step 1: Initialize distances to all nodes as infinity
-    for (const auto& pair : graph) {
-        distance[pair.first] = numeric_limits<int>::max();  // infinity
+    // Initialize all distances to infinity (max integer value)
+    for (const auto& node : graph) {
+        distance[node.first] = numeric_limits<int>::max();
     }
-    distance[source] = 0;  // Distance to source is 0
 
-    int V = graph.size();  // Number of vertices
+    // Distance to source node is zero
+    distance[source] = 0;
 
-    // Step 2: Relax all edges (V - 1) times
-    for (int i = 0; i < V - 1; ++i) {
-        for (const auto& u_pair : graph) {
-            string u = u_pair.first;
-            for (const auto& v_pair : u_pair.second) {
-                string v = v_pair.first;
-                int cost = v_pair.second;
+    // Priority queue (min-heap) to choose node with smallest tentative distance
+    using P = pair<int, string>;  // Pair of (distance, node)
+    priority_queue<P, vector<P>, greater<P>> pq;
+    pq.push({0, source});  // Start from the source node
 
-                // Relax edge if a shorter path is found
-                if (distance[u] != numeric_limits<int>::max() &&
-                    distance[u] + cost < distance[v]) {
-                    distance[v] = distance[u] + cost;
-                }
+    map<string, bool> visited;  // To track visited nodes
+
+    // Main loop: process nodes until queue is empty
+    while (!pq.empty()) {
+        int current_dist = pq.top().first;    // Smallest distance
+        string current_node = pq.top().second; // Node with that distance
+        pq.pop();  // Remove it from queue
+
+        // Skip if already visited
+        if (visited[current_node]) continue;
+        visited[current_node] = true;
+
+        // Check all neighbors of the current node
+        for (const auto& neighbor : graph.at(current_node)) {
+            string neighbor_node = neighbor.first;
+            int edge_cost = neighbor.second;
+
+            // If a shorter path is found to the neighbor
+            if (current_dist + edge_cost < distance[neighbor_node]) {
+                distance[neighbor_node] = current_dist + edge_cost;
+                pq.push({distance[neighbor_node], neighbor_node});  // Push updated distance to queue
             }
         }
     }
 
-    // Step 3: Output the final shortest distances
+    // Display the final shortest distances from source to all other nodes
     cout << "\nShortest distances from source '" << source << "':\n";
-    for (const auto& p : distance) {
-        cout << "To " << p.first << " = ";
-        if (p.second == numeric_limits<int>::max()) {
+    for (const auto& entry : distance) {
+        cout << "To " << entry.first << " = ";
+        if (entry.second == numeric_limits<int>::max()) {
             cout << "Infinity (unreachable)\n";
         } else {
-            cout << p.second << endl;
+            cout << entry.second << endl;
         }
     }
 }
 
 int main() {
-    // Step 1: Build the graph using user input
+    // Step 1: Create the graph from user input
     Graph graph = create_graph();
 
-    // Optional: Print the constructed graph for verification
+    // Step 2: Show the complete graph structure
     print_graph(graph);
 
-    // Step 2: Ask user for source node
+    // Step 3: Ask the user for the source node
     cout << "\nEnter source node: ";
     string source;
     getline(cin, source);
 
-    // Step 3: Run Distance Vector Routing from the source
-    distance_vector(graph, source);
+    // Step 4: Run Link-State Routing (Dijkstra's Algorithm)
+    link_state(graph, source);
 
     return 0;
 }
